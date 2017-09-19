@@ -1,0 +1,7 @@
+out/*
+doc/_build
+doc/_static
+doc/_templates
+.vscode/
+tmp.py
+conf.py
