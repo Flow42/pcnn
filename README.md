@@ -10,4 +10,4 @@ An implementation of Unit-Linking Pulse-Coupled Neural Networks (see [here](http
 
 ## Getting started
 
-    Put the images you want run the pcnn on in the img subfolder and run main.py or check out the jupyter notebooks in the notebooks subfolder
+Put the images you want run the pcnn on in the img subfolder and run main.py or check out the jupyter notebooks in the notebooks subfolder
