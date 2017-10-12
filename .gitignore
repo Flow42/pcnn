@@ -2,7 +2,7 @@ out/*
 doc/_build
 doc/_static
 doc/_templates
-notebooks/.ipynb_checkpoints
+notebooks/.ipynb_checkpoints/
 .vscode/
 tmp.py
 conf.py
