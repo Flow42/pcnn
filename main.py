@@ -8,17 +8,18 @@ import time
 img_name = 'img'
 # define the pcnn's parameters here
 epochs = 20
-alpha = 0.1
-beta = 1.0
+alpha = 0.05
+beta = 0.75
 V = 1.0
-k_size = 9
+k_size = 3
 kernel = np.ones((k_size,k_size))
+# kernel[4,4] = 0
 write_gif = True
-do_rog = True
+brightness_is_normed = False
 scales = (2,2)
 # instantiate a pcnn using the given parameters
 p = pcnn(kernel=kernel, epochs=epochs, V=V, alpha=alpha, beta=beta,
-         write_gif=write_gif, do_rog=do_rog, scales=scales)
+         write_gif=write_gif, brightness_is_normed=brightness_is_normed, scales=scales)
 
 # run the pcnn on the given image(s)
 # optionally the time taken is printed. If not needed comment it out.

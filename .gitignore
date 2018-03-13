@@ -3,6 +3,7 @@ doc/_build
 doc/_static
 doc/_templates
 notebooks/.ipynb_checkpoints/
+__pycache__/
 .vscode/
 tmp.py
 conf.py

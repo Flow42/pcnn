@@ -2,6 +2,8 @@ import numpy as np
 import os, time, shutil
 import imageio
 import cv2
+# import pcnn_util as pu
+from pcnn_util import *
 
 class pcnn:
     '''
@@ -14,7 +16,7 @@ class pcnn:
         epochs (int):
             The number of iterations to run the PCNN. Default is 10.
 
-        do_rog (bool): 
+        brightness_is_normed (bool): 
             If True the read images brightness is normalized using a Ratio of Gaussian (rog) approach. Default is False.
 
         V (int or np.ndarray): 
@@ -45,7 +47,7 @@ class pcnn:
             The path where outputs, like the gif, are written to. The folder will be deleted if it already exists, otherwise it is created. Default is "out/" in the current dir.
 
     '''
-    def __init__(self, kernel=None, epochs=None, do_rog=False, V=None, alpha=None, beta=None,
+    def __init__(self, kernel=None, epochs=None, brightness_is_normed=False, V=None, alpha=None, beta=None,
                  F_init=None, Y_init=None, dropout=False, scales=(1,1), t=[2,4,6,8],
                  write_gif=False, show_epoch=False, out_path='out'):
         ### input check
@@ -68,8 +70,8 @@ class pcnn:
             assert isinstance(epochs,int), 'epochs must be given as integer!'
             self.epochs = epochs
         
-        assert isinstance(do_rog, bool), 'do_rog must be a boolean!'
-        self.do_rog = do_rog
+        assert isinstance(brightness_is_normed, bool), 'brightness_is_normed must be a boolean!'
+        self.brightness_is_normed = brightness_is_normed
 
         if alpha is None:
             self.alpha = 0.005
@@ -118,92 +120,6 @@ class pcnn:
             os.makedirs(out_path)
         else:
             os.makedirs(out_path)
-
-    def _normalize_brightness(self, img, sig=10):
-        '''
-        Use ratio of gaussians to equalize illumination across a grayscale image
-
-        Args:
-            img (numpy.ndarray): a grayscale image.
-
-            sig (int) : the variance of the gaussian filter used.
-
-        '''
-        filt = cv2.GaussianBlur(img,(0,0),sig)
-        rog = np.divide(img, filt)
-        return rog
-
-    def _get_hessian_det(self, L, t):
-        ''' 
-        Compute the hessian determinant for a grayscale image blurred with t.
-
-        Args:
-            L (np.ndarray):
-                A grayscale image blurred with a sigma of t.
-
-            t (int):
-                Sigma parameter for gaussian blur.
-
-        Returns:
-            H (np.ndarray):
-                The hessian determinant of the given image.
-
-        '''
-        L_x, L_y = np.gradient(L)
-        L_xx, L_xy = np.gradient(L_x)
-        _, L_yy = np.gradient(L_y)
-        H = t**2 * (L_xx * L_yy - L_xy**2)
-        return H
-
-    def _get_scale_space(self, img, scales, compute_hessian=False):
-        '''
-        For a list of scales, return a list of scale space transformed images.
-        
-        Args:
-            img (np.ndarray):
-                Grayscale input image.
-            scales (list of int):
-                List of the scales to be used for blurring.
-            compute_hessian (bool):
-                If True, the hessian determinant is also computed for every scale.
-
-        Returns:
-            (sc_sp, hes_det) (tuple of list of np.ndarray):
-                A tuple holding a list of the scale transformed images and a list of hessian determinants for the corresponding scales. If compute_hessian is False, the second list will be empty.
-
-        '''
-        sc_sp = []
-        hes_det = []
-        for scale in scales:
-            blur = cv2.GaussianBlur(img, (0,0), scale)
-            sc_sp.append(blur)
-            if compute_hessian:
-                hes_det.append(self._get_hessian_det(blur, scale))
-        return sc_sp, hes_det
-
-    def _read_img(self, img_name, color=False):
-        ''' 
-        The image at the given path will be read, normalized and rescaled using opencv.
-        
-        Args:
-            img_name (str):
-                The path to the image that will be loaded.
-            color (bool):
-                If True the image will be loaded as RGB otherwise as grayscale
-
-        Returns:
-            img (np.ndarray):
-                The read image.
-
-        '''
-        img = cv2.imread(img_name, color)
-        h, w = img.shape
-        dh, dw = self.scales
-        img = cv2.resize(img, ( int(np.ceil(w/dw)), int(np.ceil(h/dh)) ))
-        if self.do_rog:
-            img = self._normalize_brightness(img)
-        img = cv2.normalize(img.astype(np.float), None, 0.0, 1.0, cv2.NORM_MINMAX)
-        return img
 
     def gray_pcnn(self, img, Y_init=None, F_init=None, thresh=None, gif_name=None):
         '''
@@ -337,7 +253,7 @@ class pcnn:
             Python generator object, yielding a pulse state for the given image on each next() call.
 
         '''
-        return self.gray_pcnn_gen(self._read_img(img_name, color))
+        return self.gray_pcnn_gen(read_img(img_name, color, self.scales, self.brightness_is_normed))
 
     def run(self, input, color=False, write_results=True, use_scale_space=False, use_hessian=False, Y_init=None, F_init=None, thresh=None):
         ''' 
@@ -386,7 +302,7 @@ class pcnn:
                         img_name_list.append(os.path.join(dirpath, f))
 
             for img_name in img_name_list:
-                img = self._read_img(img_name, color)
+                img = read_img(img_name, color, self.scales, self.brightness_is_normed)
                 out_name = img_name.split('/')[-1]
                 out_sub_path = os.path.join(self.out_path, os.path.splitext(out_name)[0])
                 # make a subfolder for the current image
@@ -406,10 +322,10 @@ class pcnn:
                 result.append(r)
         else:
             img_name = input
-            img = self._read_img(img_name, color)
+            img = read_img(img_name, color, self.scales, self.brightness_is_normed)
             out_name = img_name.split('/')[-1]
             if use_scale_space or use_hessian:
-                sc_sp, hes_det = self._get_scale_space(img, self.t, use_hessian)
+                sc_sp, hes_det = get_scale_space(img, self.t, use_hessian)
                 inter_list = hes_det if use_hessian else sc_sp
                 for idx, scale in enumerate(inter_list):
                     r = self.gray_pcnn(scale, Y_init, F_init, thresh, gif_name=os.path.splitext(out_name)[0] + 'scale_{}.gif'.format(self.t[idx]))
