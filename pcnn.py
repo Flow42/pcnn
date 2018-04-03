@@ -159,6 +159,7 @@ class pcnn:
         for epoch in range(self.epochs):
             Y = next(pcnn_gen)
             # compute entropy of current segmentation
+            # TODO avoid divide by zero warnings
             P_0 = np.sum(Y == 0) / h*w
             P_1 = np.sum(Y == 1) / h*w
             ent = -P_0*np.log2(P_0) - P_1*np.log2(P_1)
@@ -178,11 +179,47 @@ class pcnn:
                         out = cv2.putText(out, text=str(idx), org=(int(w-w*0.1),int(h-h*0.05)), fontFace=3, fontScale=1.1, color=(0,0,1), thickness=4)
                     writer.append_data(out)
                 print('gif {} has been written'.format(os.path.join(out_path, gif_name)))
+        # TODO explore different metrics to select a final result
         return Y_out
+
+    def get_gray_pcnn_descriptor(self, img, Y_init=None, F_init=None, thresh=None):
+        '''
+        Compute a descriptor based on the local pulse frequencies in a given image
+        '''
+        # TODO implement variants
+        #   1. rectangles of size n*m counting the pulses
+        #   2. binary or angular coding of local pulses (quadtree-like representaion?)
+
+    def get_spatial_histogram(self, img, Y_init=None, F_init=None, thresh=None):
+        '''
+        Run the gray_pcnn generator to obtain a spatial histogram, counting the pulses at each pixel
+
+        Args:
+            img (np.ndarray):
+                the image to run the PCNN on. Is asumed to be gray-scale.
+
+            Y_init (np.ndarray):
+                The initial pulse values for every neuron. Has the same shape as img. Default is zeros.
+
+            F_init (np.ndarray):
+                The feeding channel. Has the same shape as img. Defaults to the values of the given image.
+
+            thresh (int or np.ndarray):
+                Initial threshold. Give a ndarray to specify a value for each pixel. Defaults to the values of the given image.
+        
+        Returns:
+            spatial_hist (np.ndarray):
+                An array that counts the number of pulses in each pixel, normed by the number of epochs
+        '''
+        spatial_hist = np.zeros_like(img)
+        pcnn_gen = self.gray_pcnn_gen(img, Y_init, F_init, thresh)
+        for _ in range(self.epochs):
+            spatial_hist = spatial_hist + next(pcnn_gen)
+        return spatial_hist / self.epochs
 
     def gray_pcnn_gen(self, img, Y_init=None, F_init=None, thresh=None):
         '''
-        A generator with the same functionality as gray_pcnn.
+        A generator yielding the next state of pulsing neurons on each call of next().
 
         The neurons will be structured in 2D. Thus this implementation can be used with any 2-dimensional np.ndarray.
         This generator runs in an endless loop, so its termination must be implemented by its caller.
@@ -308,7 +345,7 @@ class pcnn:
                 # make a subfolder for the current image
                 os.makedirs(out_sub_path)
                 if use_scale_space or use_hessian:
-                    sc_sp, hes_det = self._get_scale_space(img, self.t, use_hessian)
+                    sc_sp, hes_det = get_scale_space(img, self.t, use_hessian)
                     inter_list = hes_det if use_hessian else sc_sp
                     for idx, scale in enumerate(inter_list):
                         r = self.gray_pcnn(scale, Y_init, F_init, thresh, 
