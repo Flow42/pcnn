@@ -336,7 +336,8 @@ class pcnn:
             img_name_list = []
             for dirpath, dirnames, files in os.walk(img_path):
                 for f in files:
-                    if f.endswith(('.png', '.bmp', '.jpg')):
+                    if f.endswith(('.png', '.bmp', '.jpg', '.jpeg')):
+                        
                         img_name_list.append(os.path.join(dirpath, f))
 
             for img_name in img_name_list:
