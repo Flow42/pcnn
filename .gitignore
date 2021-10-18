@@ -1,4 +1,5 @@
 out/*
+img_dsb/*
 doc/_build
 doc/_static
 doc/_templates
@@ -7,3 +8,9 @@ __pycache__/
 .vscode/
 tmp.py
 conf.py
+
+# ignore image file, they should not be included in the repo
+*.png
+*.jpg
+*.jpeg
+*.bmp
