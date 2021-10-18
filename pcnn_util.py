@@ -23,10 +23,15 @@ def read_img(img_name, color=False, scales=(1,1), brightness_is_normed=False):
             The read image.
 
     '''
-    img = cv2.imread(img_name, color)
-    h, w = img.shape
+    img = cv2.imread(img_name)
+    if len(img.shape) > 2:
+        h, w, c = img.shape
+        if c > 1:
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        else:
+            img = np.squeeze(img)
     dh, dw = scales
-    img = cv2.resize(img, ( int(np.ceil(w/dw)), int(np.ceil(h/dh)) ))
+    img = cv2.resize(img, ( int(np.ceil(img.shape[1] / dw )), int(np.ceil(img.shape[0] / dh)) ))
     if brightness_is_normed:
         img = normalize_brightness(img)
     img = cv2.normalize(img.astype(np.float), None, 0.0, 1.0, cv2.NORM_MINMAX)

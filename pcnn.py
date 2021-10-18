@@ -292,7 +292,8 @@ class pcnn:
         '''
         return self.gray_pcnn_gen(read_img(img_name, color, self.scales, self.brightness_is_normed))
 
-    def run(self, input, color=False, write_results=True, use_scale_space=False, use_hessian=False, Y_init=None, F_init=None, thresh=None):
+    def run(self, input, color=False, write_results=True, use_scale_space=False,
+            use_hessian=False, Y_init=None, F_init=None, thresh=None):
         ''' 
         Wrapper for all the different models of pcnn
 
