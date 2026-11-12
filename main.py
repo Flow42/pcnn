@@ -1,18 +1,16 @@
 
 
 import numpy as np
-import os
-import cv2
-from matplotlib import pyplot as plt
-print('Test')
 from pcnn import pcnn
-from pcnn_util import read_img
 import time
 
 if __name__ == '__main__':
 	# enter the path to the input image or a folder holding
 	# input images here
-	img_name = 'img/'
+	import argparse
+	parser = argparse.ArgumentParser(description='Run a unit-linking PCNN on an image or folder')
+	parser.add_argument('input', help='Image filename or image folder')
+	img_name = parser.parse_args().input
 	# define the pcnn's parameters here
 	epochs = 20
 	alpha = 0.05

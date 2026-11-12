@@ -1,9 +1,9 @@
 import numpy as np
-import os, time, shutil
-import imageio
+import os
+import imageio.v2 as imageio
 import cv2
 # import pcnn_util as pu
-from pcnn_util import *
+from pcnn_util import read_img, get_scale_space
 
 class pcnn:
     '''
@@ -44,7 +44,7 @@ class pcnn:
             If True, each frame of the written gif shows the number of the current epoch. Default is false.
 
         out_path (str): 
-            The path where outputs, like the gif, are written to. The folder will be deleted if it already exists, otherwise it is created. Default is "out/" in the current dir.
+            The path where outputs, like the gif, are written to. The folder is created if needed; existing matching output files are overwritten. Default is "out/" in the current dir.
 
     '''
     def __init__(self, kernel=None, epochs=None, brightness_is_normed=False, V=None, alpha=None, beta=None,
@@ -69,6 +69,8 @@ class pcnn:
         else:
             assert isinstance(epochs,int), 'epochs must be given as integer!'
             self.epochs = epochs
+        if self.epochs < 1:
+            raise ValueError('epochs must be positive')
         
         assert isinstance(brightness_is_normed, bool), 'brightness_is_normed must be a boolean!'
         self.brightness_is_normed = brightness_is_normed
@@ -96,7 +98,7 @@ class pcnn:
 
         assert isinstance(scales, tuple) and all(isinstance(x, int) for x in scales) and len(scales) == 2,\
             'scales must be a tuple of 2 ints: (dh, dw)'
-        assert all(scales) >= 0, 'a scaling factor can not be negative!'
+        assert all(x > 0 for x in scales), 'a scaling factor can not be negative!'
         self.scales = scales
 
         assert isinstance(t, list) and all(isinstance(x, int) for x in t), 't must be a list of ints!'
@@ -114,12 +116,7 @@ class pcnn:
         ###
     
     def _create_out_folder(self):
-        out_path = self.out_path
-        if os.path.isdir(out_path):
-            shutil.rmtree(out_path)
-            os.makedirs(out_path)
-        else:
-            os.makedirs(out_path)
+        os.makedirs(self.out_path, exist_ok=True)
 
     def gray_pcnn(self, img, Y_init=None, F_init=None, thresh=None, gif_name=None):
         '''
@@ -138,7 +135,7 @@ class pcnn:
                 The initial pulse values for every neuron. Has the same shape as img. Default is zeros.
 
             thresh (int or np.ndarray): 
-                Initial threshold. Give a ndarray to specify a value for each pixel. Defaults to the values of the given image.
+                Initial threshold. Give a ndarray to specify a value for each pixel. Defaults to one.
 
         Returns:
             Y_out (np.ndarray):
@@ -153,16 +150,17 @@ class pcnn:
             gif_name = 'movie.gif'
         assert isinstance(gif_name, str), 'The gif_name must be a valid string!'
         assert gif_name.endswith('.gif'), 'The .gif extension must be given explicitly!'
-        max_ent = -np.Inf
+        max_ent = -np.inf
         if write_gif:
+            self._create_out_folder()
             out_list=[]
         for epoch in range(self.epochs):
             Y = next(pcnn_gen)
             # compute entropy of current segmentation
             # TODO avoid divide by zero warnings
-            P_0 = np.sum(Y == 0) / h*w
-            P_1 = np.sum(Y == 1) / h*w
-            ent = -P_0*np.log2(P_0) - P_1*np.log2(P_1)
+            probabilities = np.array([np.mean(Y == 0), np.mean(Y == 1)])
+            probabilities = probabilities[probabilities > 0]
+            ent = -np.sum(probabilities * np.log2(probabilities))
             # and store the result with the highest entropy
             if ent > max_ent:
                 max_ent = ent
@@ -172,7 +170,7 @@ class pcnn:
                 # convert to float for correct behaviour with opencv
                 out_list.append((255*Y).astype(np.uint8))
         if write_gif:
-            with imageio.get_writer(os.path.join(out_path, gif_name), mode='I',fps=8) as writer:
+            with imageio.get_writer(os.path.join(out_path, gif_name), mode='I', duration=125, loop=0) as writer:
                 for idx, Y in enumerate(out_list):
                     out = np.dstack((Y,)*3)
                     if self.show_epoch:
@@ -205,7 +203,7 @@ class pcnn:
                 The feeding channel. Has the same shape as img. Defaults to the values of the given image.
 
             thresh (int or np.ndarray):
-                Initial threshold. Give a ndarray to specify a value for each pixel. Defaults to the values of the given image.
+                Initial threshold. Give a ndarray to specify a value for each pixel. Defaults to one.
         
         Returns:
             spatial_hist (np.ndarray):
@@ -235,13 +233,16 @@ class pcnn:
                 The feeding channel. Has the same shape as img. Defaults to the values of the given image.
 
             thresh (int or np.ndarray):
-                Initial threshold. Give a ndarray to specify a value for each pixel. Defaults to the values of the given image.
+                Initial threshold. Give a ndarray to specify a value for each pixel. Defaults to one.
             
         Yields:
             Y (np.ndarray):
                 The current state of all pulses.
            
         '''
+        img = np.asarray(img, dtype=np.float64)
+        if img.ndim != 2 or img.size == 0 or not np.isfinite(img).all():
+            raise ValueError('img must be a nonempty finite 2D array')
         h,w = img.shape
         if Y_init is None:
             Y = np.zeros((h,w))
@@ -266,10 +267,13 @@ class pcnn:
         beta = self.beta
 
         while True:
-            k = self.kernel
+            k = np.array(self.kernel, dtype=np.float64, copy=True)
+            if k.ndim != 2 or any(size % 2 == 0 for size in k.shape) or np.any(k < 0):
+                raise ValueError("kernel must be a nonnegative 2D array with odd dimensions")
+            k[k.shape[0] // 2, k.shape[1] // 2] = 0
             if self.dropout:
                 k = k * np.random.randint(2, size=k.shape)            
-            Y_sum = cv2.filter2D(Y.astype(np.float), -1, k, borderType=cv2.BORDER_REFLECT_101)
+            Y_sum = cv2.filter2D(Y.astype(np.float64), -1, k, borderType=cv2.BORDER_CONSTANT)
             L = Y_sum > 0
             # compute inner activation
             U = F*(1 + beta*L)
@@ -322,7 +326,7 @@ class pcnn:
                 The feeding channel. Has the same shape as img. Defaults to the values of the given image.
 
             thresh (int or np.ndarray): 
-                Initial threshold. Give a ndarray to specify a value for each pixel. Defaults to the values of the given image.
+                Initial threshold. Give a ndarray to specify a value for each pixel. Defaults to one.
 
         Returns:
             result (list of np.ndarray):
@@ -330,7 +334,10 @@ class pcnn:
 
         '''
         result = []
-        self._create_out_folder()
+        if color:
+            raise ValueError("PCNN requires grayscale input; use color=False")
+        if write_results or self.write_gif:
+            self._create_out_folder()
         if os.path.isdir(input):
             img_path = input
             img_name_list = []
@@ -345,7 +352,8 @@ class pcnn:
                 out_name = img_name.split('/')[-1]
                 out_sub_path = os.path.join(self.out_path, os.path.splitext(out_name)[0])
                 # make a subfolder for the current image
-                os.makedirs(out_sub_path)
+                if write_results:
+                    os.makedirs(out_sub_path, exist_ok=True)
                 if use_scale_space or use_hessian:
                     sc_sp, hes_det = get_scale_space(img, self.t, use_hessian)
                     inter_list = hes_det if use_hessian else sc_sp

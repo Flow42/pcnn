@@ -23,18 +23,24 @@ def read_img(img_name, color=False, scales=(1,1), brightness_is_normed=False):
             The read image.
 
     '''
-    img = cv2.imread(img_name)
+    if color:
+        raise ValueError("PCNN requires grayscale input; use color=False")
+    if len(scales) != 2 or any(x <= 0 for x in scales):
+        raise ValueError("scales must contain two positive factors")
+    img = cv2.imread(str(img_name))
+    if img is None:
+        raise ValueError(f"Cannot read image: {img_name}")
     if len(img.shape) > 2:
         h, w, c = img.shape
         if c > 1:
-            img = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         else:
             img = np.squeeze(img)
     dh, dw = scales
     img = cv2.resize(img, ( int(np.ceil(img.shape[1] / dw )), int(np.ceil(img.shape[0] / dh)) ))
     if brightness_is_normed:
         img = normalize_brightness(img)
-    img = cv2.normalize(img.astype(np.float), None, 0.0, 1.0, cv2.NORM_MINMAX)
+    img = cv2.normalize(img.astype(np.float64), None, 0.0, 1.0, cv2.NORM_MINMAX)
     return img
 
 def normalize_brightness(img, sig=10):
@@ -47,8 +53,9 @@ def normalize_brightness(img, sig=10):
         sig (int) : the variance of the gaussian filter used.
 
     '''
+    img = np.asarray(img, dtype=np.float64)
     filt = cv2.GaussianBlur(img,(0,0),sig)
-    rog = np.divide(img, filt)
+    rog = np.divide(img, filt, out=np.zeros_like(img), where=filt != 0)
     return rog
 
 def get_hessian_det(L, t):

@@ -1,0 +1,19 @@
+[project]
+name = "pcnn"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "imageio>=2.38.1",
+    "numpy>=2.5.4",
+    "opencv-python-headless>=5.0.0.93",
+    "pillow>=13.0.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
+notebooks = [
+    "jupyterlab>=4.6.6",
+    "matplotlib>=3.11.2",
+]

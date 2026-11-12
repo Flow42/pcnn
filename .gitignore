@@ -1,5 +1,6 @@
 out/*
 img_dsb/*
+agent_doc
 doc/_build
 doc/_static
 doc/_templates
@@ -14,3 +15,5 @@ conf.py
 *.jpg
 *.jpeg
 *.bmp
+.venv/
+.pytest_cache/
