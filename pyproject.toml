@@ -3,7 +3,9 @@ name = "pcnn"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
+    "gradio>=6,<7",
     "imageio>=2.38.1",
+    "imageio-ffmpeg>=0.8.1",
     "numpy>=2.5.4",
     "opencv-python-headless>=5.0.0.93",
     "pillow>=13.0.0",
